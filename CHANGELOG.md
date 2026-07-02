@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.1.3 — 2026-07-02
+
+### Fixes
+
+- Re-hide the match duration on the match-selection / list screens. The runtime label had come back and spoiled set counts — a long video gives away a 3-set match. (#4)
+
 ## v1.1.2 — 2026-06-22
 
 ### Changes
