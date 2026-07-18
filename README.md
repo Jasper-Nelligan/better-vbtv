@@ -26,6 +26,7 @@ Active on the `/player` page:
 | `↑` / `↓` | Volume up / down |
 | `M` | Mute / unmute |
 | `K` / `Space` | Play / pause |
+| `f` | Toggle fullscreen |
 | `s` | Toggle spoiler-free mode |
 | `?` | Toggle shortcuts overlay |
 | `Esc` | Close overlay |

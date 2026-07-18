@@ -85,6 +85,7 @@ export function mountShortcutsOverlay(rootId: string): ShortcutsOverlayHandle {
                 <div class={styles.groupTitle}>Playback</div>
                 <Row keys={<><Kbd k="space" /><Kbd k="k" /></>} label="Play / pause" />
                 <Row keys={<><Kbd k="<" /><Kbd k=">" /></>} label="Slow down / speed up" />
+                <Row keys={<Kbd k="f" />} label="Toggle fullscreen" />
               </div>
               <div class={styles.group}>
                 <div class={styles.groupTitle}>Volume</div>

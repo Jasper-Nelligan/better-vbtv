@@ -19,6 +19,7 @@ interface PlayerShortcuts {
   adjustVolume(delta: number): void;
   adjustPlaybackRate(delta: number): void;
   togglePlay(): void;
+  toggleFullscreen(): void;
 }
 
 interface VideoControllerOptions {
@@ -157,6 +158,13 @@ export class VideoController implements PlayerShortcuts {
           break;
         case '<':
           this.adjustPlaybackRate(-this.PLAYBACK_RATE_DELTA);
+          break;
+
+        // Fullscreen
+        case 'f':
+          if (e.ctrlKey || e.metaKey || e.altKey) break;
+          e.preventDefault();
+          this.toggleFullscreen();
           break;
       }
     };
@@ -404,5 +412,28 @@ export class VideoController implements PlayerShortcuts {
     } else {
       this.video.pause();
     }
+  }
+
+  public toggleFullscreen(): void {
+    if (!this.video) return;
+    if (document.fullscreenElement) {
+      void document.exitFullscreen();
+      toast('⤢ Exit fullscreen');
+      return;
+    }
+    // Prefer the player container so overlays/controls stay visible; fall back
+    // to the video element itself.
+    const target =
+      (this.video.closest('.video-js') as HTMLElement | null) ??
+      (this.video.parentElement ?? this.video);
+    const request = target.requestFullscreen?.bind(target);
+    if (!request) return;
+    void request().then(
+      () => toast('⛶ Fullscreen'),
+      () => {
+        // Some browsers reject a container request; fall back to the video.
+        void this.video?.requestFullscreen?.();
+      },
+    );
   }
 }
