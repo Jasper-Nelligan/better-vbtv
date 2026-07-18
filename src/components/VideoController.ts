@@ -19,6 +19,7 @@ interface PlayerShortcuts {
   adjustVolume(delta: number): void;
   adjustPlaybackRate(delta: number): void;
   togglePlay(): void;
+  toggleFullscreen(): void;
 }
 
 interface VideoControllerOptions {
@@ -90,9 +91,24 @@ export class VideoController implements PlayerShortcuts {
       return
     }
     this.keydownListener = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+      // Leave Cmd/Ctrl/Alt chords to the browser (Shift stays — it types '<' '>').
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
 
+      const target = e.target as HTMLElement;
+      // Don't hijack typing in fields or editable content.
+      if (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT' ||
+        target.isContentEditable
+      ) return;
+      // Leave video.js menus their own arrow-key nav.
+      if (target.closest('.vjs-menu, [role="menu"], [role="menuitem"]')) return;
+      // Space on a focused control activates it rather than toggling play.
+      if (e.key === ' ' && target.closest('button, [role="button"], a[href]')) return;
+
+      // Cleared by `default` for keys we don't bind, so they pass through.
+      let handled = true;
       switch (e.key.toLowerCase()) {
         // Seek controls
         case 'arrowleft':
@@ -158,10 +174,25 @@ export class VideoController implements PlayerShortcuts {
         case '<':
           this.adjustPlaybackRate(-this.PLAYBACK_RATE_DELTA);
           break;
+
+        // Fullscreen
+        case 'f':
+          this.toggleFullscreen();
+          break;
+
+        default:
+          handled = false;
+      }
+
+      if (handled) {
+        // Stop native scroll and video.js's own handler from also acting.
+        e.preventDefault();
+        e.stopPropagation();
       }
     };
 
-    document.addEventListener('keydown', this.keydownListener);
+    // Capture phase: fire before a focused video.js control swallows the key.
+    document.addEventListener('keydown', this.keydownListener, true);
 
     // Media key support
     if ('mediaSession' in navigator) {
@@ -345,7 +376,7 @@ export class VideoController implements PlayerShortcuts {
 
     // Remove event listeners
     if (this.keydownListener) {
-      document.removeEventListener('keydown', this.keydownListener);
+      document.removeEventListener('keydown', this.keydownListener, true);
       this.keydownListener = null;
     }
 
@@ -403,5 +434,28 @@ export class VideoController implements PlayerShortcuts {
     } else {
       this.video.pause();
     }
+  }
+
+  public toggleFullscreen(): void {
+    if (!this.video) return;
+    if (document.fullscreenElement) {
+      void document.exitFullscreen();
+      toast('⤢ Exit fullscreen');
+      return;
+    }
+    // Prefer the player container so overlays/controls stay visible; fall back
+    // to the video element itself.
+    const target =
+      (this.video.closest('.video-js') as HTMLElement | null) ??
+      (this.video.parentElement ?? this.video);
+    const request = target.requestFullscreen?.bind(target);
+    if (!request) return;
+    void request().then(
+      () => toast('⛶ Fullscreen'),
+      () => {
+        // Some browsers reject a container request; fall back to the video.
+        void this.video?.requestFullscreen?.();
+      },
+    );
   }
 }
