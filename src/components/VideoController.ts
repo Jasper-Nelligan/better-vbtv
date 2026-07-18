@@ -91,9 +91,24 @@ export class VideoController implements PlayerShortcuts {
       return
     }
     this.keydownListener = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+      // Leave Cmd/Ctrl/Alt chords to the browser (Shift stays — it types '<' '>').
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
 
+      const target = e.target as HTMLElement;
+      // Don't hijack typing in fields or editable content.
+      if (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT' ||
+        target.isContentEditable
+      ) return;
+      // Leave video.js menus their own arrow-key nav.
+      if (target.closest('.vjs-menu, [role="menu"], [role="menuitem"]')) return;
+      // Space on a focused control activates it rather than toggling play.
+      if (e.key === ' ' && target.closest('button, [role="button"], a[href]')) return;
+
+      // Cleared by `default` for keys we don't bind, so they pass through.
+      let handled = true;
       switch (e.key.toLowerCase()) {
         // Seek controls
         case 'arrowleft':
@@ -162,14 +177,21 @@ export class VideoController implements PlayerShortcuts {
 
         // Fullscreen
         case 'f':
-          if (e.ctrlKey || e.metaKey || e.altKey) break;
-          e.preventDefault();
           this.toggleFullscreen();
           break;
+
+        default:
+          handled = false;
+      }
+
+      if (handled) {
+        // Stop native scroll and video.js's own handler from also acting.
+        e.preventDefault();
+        e.stopPropagation();
       }
     };
 
-    // Capture phase so we receive keys before video.js swallows them
+    // Capture phase: fire before a focused video.js control swallows the key.
     document.addEventListener('keydown', this.keydownListener, true);
 
     // Media key support
