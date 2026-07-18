@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.2.0 — 2026-07-18
+
+### Features
+
+- Fullscreen toggle: press `f` to enter or exit fullscreen on the player. Thanks @Jasper-Nelligan.
+
+### Fixes
+
+- Arrow-key seeking now works after clicking the fullscreen button — the keys were being swallowed once a player control had focus. Thanks @Jasper-Nelligan.
+- Player shortcuts no longer double-trigger with the built-in video.js controls: a focused seek bar or menu won't also act on the key, and keys typed in menus or inputs pass through untouched.
+
 ## v1.1.3 — 2026-07-02
 
 ### Fixes
