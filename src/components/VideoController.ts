@@ -47,11 +47,13 @@ export class VideoController implements PlayerShortcuts {
   private trackedId: string | null = null; // id we're currently recording for
   private watchQualified: boolean = false; // recorded to history yet?
   private resumePromptActive: boolean = false; // resume toast still showing for trackedId?
+  private finished: boolean = false;       // reached the end; ignore the reset-to-0
   private lastSaveAt: number = 0;          // throttle clock for position writes
   private seekSaveTimer: ReturnType<typeof setTimeout> | null = null;
   private timeupdateListener: (() => void) | null = null;
   private seekedListener: (() => void) | null = null;
   private pauseListener: (() => void) | null = null;
+  private endedListener: (() => void) | null = null;
   private beforeUnloadListener: (() => void) | null = null;
 
   constructor({
@@ -236,11 +238,13 @@ export class VideoController implements PlayerShortcuts {
     this.timeupdateListener = () => this.onTimeUpdate();
     this.seekedListener = () => this.scheduleSeekSave();
     this.pauseListener = () => this.flushPosition();
+    this.endedListener = () => this.onEnded();
     this.beforeUnloadListener = () => this.flushPosition();
 
     this.video.addEventListener('timeupdate', this.timeupdateListener);
     this.video.addEventListener('seeked', this.seekedListener);
     this.video.addEventListener('pause', this.pauseListener);
+    this.video.addEventListener('ended', this.endedListener);
     window.addEventListener('beforeunload', this.beforeUnloadListener);
   }
 
@@ -284,6 +288,7 @@ export class VideoController implements PlayerShortcuts {
       this.trackedId = id;
       this.watchQualified = false;
       this.resumePromptActive = false; // cleared; re-armed by maybeOfferResume if it prompts
+      this.finished = false;
       this.lastSaveAt = 0;
       if (id) void this.maybeOfferResume(id);
       return;
@@ -292,6 +297,16 @@ export class VideoController implements PlayerShortcuts {
 
     // Resume prompt still showing — leave this video's history untouched.
     if (this.resumePromptActive) return;
+
+    // Finished this video: don't let the player's end-of-playback reset-to-0
+    // overwrite the completed position. Re-arm only once a genuine replay is
+    // under way (playing, past the qualify threshold, and not still at the end).
+    if (this.finished) {
+      const dur = video.duration;
+      const nearEnd = Number.isFinite(dur) && video.currentTime >= dur - 15;
+      if (video.paused || nearEnd || video.currentTime < WATCH_QUALIFY_SEC) return;
+      this.finished = false;
+    }
 
     // Qualify: first time we cross the threshold, record to history.
     if (!this.watchQualified && video.currentTime >= WATCH_QUALIFY_SEC) {
@@ -342,6 +357,26 @@ export class VideoController implements PlayerShortcuts {
     }
   }
 
+  // The video reached its end. Players reset currentTime to 0 here (to show the
+  // replay overlay), which would otherwise get persisted as the resume point —
+  // resetting the entry to 0:00. Mark it fully-watched instead so it reads as
+  // complete and won't offer a resume next time.
+  private onEnded(): void {
+    const video = this.video;
+    if (!video || !this.trackedId || !this.watchQualified) return;
+    if (this.resumePromptActive) return;
+    this.finished = true;
+    const durationSec = Number.isFinite(video.duration) ? video.duration : undefined;
+    if (durationSec) {
+      if (this.seekSaveTimer) {
+        clearTimeout(this.seekSaveTimer);
+        this.seekSaveTimer = null;
+      }
+      this.lastSaveAt = Date.now();
+      void savePosition(this.trackedId, durationSec, durationSec);
+    }
+  }
+
   // Persist the position POSITION_SAVE_SEC after the last scrub ("progress nav").
   private scheduleSeekSave(): void {
     if (!this.watchQualified) return;
@@ -357,6 +392,9 @@ export class VideoController implements PlayerShortcuts {
     if (!this.trackedId || !this.watchQualified || !this.video) return;
     // Don't overwrite the saved position while the resume prompt is still up.
     if (this.resumePromptActive) return;
+    // Video finished (or is sitting on the end-of-playback reset-to-0): onEnded
+    // already stored it as complete, so leave it be.
+    if (this.finished || this.video.ended) return;
     this.lastSaveAt = Date.now();
     const durationSec = Number.isFinite(this.video.duration) ? this.video.duration : undefined;
     void savePosition(this.trackedId, this.video.currentTime, durationSec);
@@ -371,6 +409,7 @@ export class VideoController implements PlayerShortcuts {
       if (this.timeupdateListener) this.video.removeEventListener('timeupdate', this.timeupdateListener);
       if (this.seekedListener) this.video.removeEventListener('seeked', this.seekedListener);
       if (this.pauseListener) this.video.removeEventListener('pause', this.pauseListener);
+      if (this.endedListener) this.video.removeEventListener('ended', this.endedListener);
     }
     if (this.beforeUnloadListener) {
       window.removeEventListener('beforeunload', this.beforeUnloadListener);
@@ -378,6 +417,7 @@ export class VideoController implements PlayerShortcuts {
     this.timeupdateListener = null;
     this.seekedListener = null;
     this.pauseListener = null;
+    this.endedListener = null;
     this.beforeUnloadListener = null;
 
     // Remove event listeners
