@@ -7,3 +7,20 @@ body:not(.with-spoiler) .bg-runtime {
 body:not(.with-spoiler) .vjs-control-bar {
   display: none !important;
 }
+
+/* YouTube-style watch-progress bar overlaid on thumbnails (browse/list views) */
+.better-vbtv-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4px;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.better-vbtv-progress-fill {
+  height: 100%;
+  background: #ff0000;
+}
