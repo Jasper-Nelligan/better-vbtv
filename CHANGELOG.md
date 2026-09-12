@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.3.0 — 2026-09-12
+
+### Features
+
+- Audio track hotkey: press `a` to cycle through alternate audio tracks (e.g. commentary language options, ambient sound) on matches that have them. (#8)
+
 ## v1.2.0 — 2026-07-18
 
 ### Features
