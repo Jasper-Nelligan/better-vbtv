@@ -144,12 +144,6 @@ export class VideoController implements PlayerShortcuts {
         case 'arrowdown':
           this.adjustVolume(-this.VOLUMN_DELTA);
           break;
-        case 'm':
-          if (this.video) {
-            this.video.muted = !this.video.muted;
-            toast(this.video.muted ? '🔇 Muted' : '🔊 Unmuted');
-          }
-          break;
 
         // Playback controls
         case 'k':
