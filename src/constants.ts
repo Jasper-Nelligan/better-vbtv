@@ -33,6 +33,9 @@ export const WATCH_QUALIFY_SEC = 5
 // (the seekable end, which grows with wall-clock time), so an isFinite() check
 // on its own sees nothing unusual.
 export const LIVE_PLAYER_CLASS = 'vjs-live'
+// How long to wait for the player to report metadata before giving up on the
+// auto-resume seek (ms) — currentTime writes before that are dropped.
+export const RESUME_METADATA_WAIT_MS = 5000
 // Throttle/debounce for persisting the resume position (seconds).
 export const POSITION_SAVE_SEC = 5
 // Cap the stored list so storage can't grow unbounded.

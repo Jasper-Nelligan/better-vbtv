@@ -10,6 +10,7 @@ import {
   WATCH_QUALIFY_SEC,
   POSITION_SAVE_SEC,
   LIVE_PLAYER_CLASS,
+  RESUME_METADATA_WAIT_MS,
 } from "../constants";
 import { getEntry, recordView, savePosition } from "../utils/history";
 import { parseJwMediaId, fetchJwMeta, formatTime } from "../utils/videoMeta";
@@ -49,7 +50,7 @@ export class VideoController implements PlayerShortcuts {
   // the live media id and reset state whenever it changes.
   private trackedId: string | null = null; // id we're currently recording for
   private watchQualified: boolean = false; // recorded to history yet?
-  private resumePromptActive: boolean = false; // resume toast still showing for trackedId?
+  private resumeSeekPending: boolean = false; // auto-resume seek not applied yet?
   private finished: boolean = false;       // reached the end; ignore the reset-to-0
   private lastSaveAt: number = 0;          // throttle clock for position writes
   private seekSaveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -227,7 +228,7 @@ export class VideoController implements PlayerShortcuts {
   // - The resume position is persisted at most once per POSITION_SAVE_SEC during
   //   continuous playback, plus POSITION_SAVE_SEC after the last scrub, and is
   //   always flushed on pause / page unload / cleanup.
-  // - On load, if a saved position exists we offer a one-tap "Resume?" prompt.
+  // - On load, if a saved position exists we seek straight to it (no prompt).
   // ---------------------------------------------------------------------------
   private setupWatchTracking(): void {
     if (!this.video) {
@@ -239,7 +240,7 @@ export class VideoController implements PlayerShortcuts {
     if (!this.trackedId) {
       log("setupWatchTracking: no JW media id in URL");
     } else {
-      void this.maybeOfferResume(this.trackedId);
+      void this.autoResume(this.trackedId);
     }
 
     this.timeupdateListener = () => this.onTimeUpdate();
@@ -255,7 +256,8 @@ export class VideoController implements PlayerShortcuts {
     window.addEventListener('beforeunload', this.beforeUnloadListener);
   }
 
-  private async maybeOfferResume(id: string): Promise<void> {
+  // Resume is automatic — no prompt.
+  private async autoResume(id: string): Promise<void> {
     const entry = await getEntry(id);
     if (!entry || entry.positionSec <= WATCH_QUALIFY_SEC) return;
     // Skip if effectively finished (within last 15s of a known duration).
@@ -264,24 +266,49 @@ export class VideoController implements PlayerShortcuts {
     if (parseJwMediaId(window.location.href) !== id) return;
 
     const pos = entry.positionSec;
-    // Freeze history writes for this video until the user acts on the prompt.
-    this.resumePromptActive = true;
-    toast(`Resume from ${formatTime(pos)}?`, {
-      dismissible: true,
-      onDismiss: () => {
-        this.resumePromptActive = false;
-      },
-      action: {
-        label: 'Resume',
-        onClick: () => {
-          this.resumePromptActive = false;
-          if (this.video && parseJwMediaId(window.location.href) === id) {
-            this.video.currentTime = pos;
-            toast(`▶️ Resumed ${formatTime(pos)}`);
-          }
-        },
-      },
-    });
+    // Freeze history writes for this video until the seek lands, so the
+    // pre-resume position can't overwrite the point we're jumping to.
+    this.resumeSeekPending = true;
+    await this.seekToResume(id, pos);
+  }
+
+  // A currentTime write before the player knows its duration is dropped on the
+  // floor, so wait for metadata when it hasn't arrived yet. The wait is capped:
+  // a video that never reports metadata must not leave writes frozen forever.
+  private async seekToResume(id: string, pos: number): Promise<void> {
+    const video = this.video;
+    if (!video) {
+      this.resumeSeekPending = false;
+      return;
+    }
+
+    if (video.readyState === 0) {
+      await new Promise<void>((resolve) => {
+        const done = () => {
+          clearTimeout(timer);
+          video.removeEventListener('loadedmetadata', done);
+          resolve();
+        };
+        const timer = setTimeout(done, RESUME_METADATA_WAIT_MS);
+        video.addEventListener('loadedmetadata', done);
+      });
+    }
+
+    // That wait is unbounded in user time — the video may have been swapped or
+    // the controller torn down while it ran.
+    if (this.video !== video || parseJwMediaId(window.location.href) !== id) {
+      this.resumeSeekPending = false;
+      return;
+    }
+    if (video.readyState === 0) {
+      log('seekToResume: no metadata, skipping resume');
+      this.resumeSeekPending = false;
+      return;
+    }
+
+    video.currentTime = pos;
+    this.resumeSeekPending = false;
+    toast(`▶️ Resumed from ${formatTime(pos)}`);
   }
 
   // A live stream has no resume point and no meaningful progress, because
@@ -314,16 +341,16 @@ export class VideoController implements PlayerShortcuts {
       this.flushPosition();      // save the outgoing video first
       this.trackedId = id;
       this.watchQualified = false;
-      this.resumePromptActive = false; // cleared; re-armed by maybeOfferResume if it prompts
+      this.resumeSeekPending = false; // cleared; re-armed by autoResume if it seeks
       this.finished = false;
       this.lastSaveAt = 0;
-      if (id) void this.maybeOfferResume(id);
+      if (id) void this.autoResume(id);
       return;
     }
     if (!id) return;
 
-    // Resume prompt still showing — leave this video's history untouched.
-    if (this.resumePromptActive) return;
+    // Auto-resume seek still pending — leave this video's history untouched.
+    if (this.resumeSeekPending) return;
 
     // Finished this video: don't let the player's end-of-playback reset-to-0
     // overwrite the completed position. Re-arm only once a genuine replay is
@@ -397,7 +424,7 @@ export class VideoController implements PlayerShortcuts {
   private onEnded(): void {
     const video = this.video;
     if (!video || !this.trackedId || !this.watchQualified) return;
-    if (this.resumePromptActive) return;
+    if (this.resumeSeekPending) return;
     // A broadcast ending is not a video being finished.
     if (this.isLive()) return;
     this.finished = true;
@@ -425,8 +452,8 @@ export class VideoController implements PlayerShortcuts {
       this.seekSaveTimer = null;
     }
     if (!this.trackedId || !this.watchQualified || !this.video) return;
-    // Don't overwrite the saved position while the resume prompt is still up.
-    if (this.resumePromptActive) return;
+    // Don't overwrite the saved position before the auto-resume seek lands.
+    if (this.resumeSeekPending) return;
     // Reached from pause / beforeunload / cleanup as well as the throttle, so
     // it needs the live guard independently of onTimeUpdate's.
     if (this.isLive()) return;
