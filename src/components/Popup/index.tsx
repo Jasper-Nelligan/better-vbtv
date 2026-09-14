@@ -203,14 +203,17 @@ const Popup = () => {
                     <Show when={entry.thumbnail} fallback={<span class={styles.thumbFallback}>🏐</span>}>
                       <img src={entry.thumbnail} alt="" loading="lazy" />
                     </Show>
-                    <Show when={progressPct(entry) > 0}>
+                    {/* The bar leaks the runtime (elapsed time over fraction filled),
+                        so spoiler-free mode drops it and the sub line says "Watched"
+                        instead — elapsed time only, same as the page thumbnails. */}
+                    <Show when={!isEnabled() && progressPct(entry) > 0}>
                       <span class={styles.progress} style={{ width: `${progressPct(entry)}%` }} />
                     </Show>
                   </div>
                   <div class={styles.historyMeta}>
                     <span class={styles.historyTitle}>{entry.title}</span>
                     <span class={styles.historySub}>
-                      {formatTime(entry.positionSec)} · {formatAgo(entry.updatedAt)}
+                      {isEnabled() ? 'Watched ' : ''}{formatTime(entry.positionSec)} · {formatAgo(entry.updatedAt)}
                     </span>
                   </div>
                   <button

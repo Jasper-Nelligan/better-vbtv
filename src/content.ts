@@ -14,6 +14,7 @@ import { mountShortcutsOverlay } from './components/ShortcutsOverlay';
 import { mountToast } from './components/Toast';
 import { toast } from './utils/toast';
 import { getNoSpoiler, setNoSpoiler } from './utils/settings';
+import { ThumbnailProgress } from './utils/thumbnailProgress';
 import ext from './utils/browser';
 
 log("🏐🏐🏐")
@@ -21,6 +22,12 @@ log("🏐🏐🏐")
 mountToast(TOAST_ID);
 const shortcutsOverlay = mountShortcutsOverlay(SHORTCUTS_OVERLAY_ID);
 let onPlayerPage = false;
+
+// Draw watch-progress bars on thumbnails across every VBTV page. This is
+// route-agnostic (its own MutationObserver tracks SPA navigation and lazy-loaded
+// cards), so it lives outside the player-only route handling below.
+const thumbnailProgress = new ThumbnailProgress();
+void thumbnailProgress.start();
 
 setupSpoilerFreeToggleListener();
 setupGlobalKeyboard();
@@ -176,4 +183,5 @@ window.addEventListener('beforeunload', () => {
   }
   cleanupObserver()
   cleanupRenderer()
+  thumbnailProgress.stop()
 });
