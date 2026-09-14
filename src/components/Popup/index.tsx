@@ -41,7 +41,7 @@ const SHORTCUTS: { keys: string; label: string }[] = [
   { keys: 'f', label: 'Toggle fullscreen' },
   { keys: 'a', label: 'Cycle audio track' },
   { keys: '< >', label: 'Slow down / speed up' },
-  { keys: '↑ ↓ m', label: 'Volume / mute' },
+  { keys: '↑ ↓', label: 'Volume up / down' },
   { keys: ', .', label: 'Frame step (paused)' },
   { keys: 'Home End', label: 'Jump to start / end' },
 ];
