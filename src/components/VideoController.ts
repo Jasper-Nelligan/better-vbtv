@@ -8,6 +8,7 @@ import {
   SEEK_LARGE_KEY,
   WATCH_QUALIFY_SEC,
   POSITION_SAVE_SEC,
+  LIVE_PLAYER_CLASS,
 } from "../constants";
 import { getEntry, recordView, savePosition } from "../utils/history";
 import { parseJwMediaId, fetchJwMeta, formatTime } from "../utils/videoMeta";
@@ -273,6 +274,26 @@ export class VideoController implements PlayerShortcuts {
     });
   }
 
+  // A live stream has no resume point and no meaningful progress, because
+  // `currentTime` is a position on the stream's timeline rather than an amount
+  // watched: joining a match at the 90th minute puts the playhead at 90:00
+  // immediately. Recording that would say "watched 90 minutes" after five
+  // seconds — and since the replay VOD reuses the same JW media id, the entry
+  // outlives the broadcast and marks the replay as already finished. So live
+  // playback is excluded from history entirely.
+  //
+  // Both checks are needed. A pure live stream reports no duration, but one with
+  // a DVR window reports the seekable end, which is finite and merely grows, so
+  // only the player's own `vjs-live` flag catches that. Neither can false-positive
+  // on a VOD; the isFinite() arm is also true before metadata arrives, which is
+  // harmless — nothing worth saving exists that early either.
+  private isLive(): boolean {
+    const video = this.video;
+    if (!video) return false;
+    if (!Number.isFinite(video.duration)) return true;
+    return !!video.closest(`.${LIVE_PLAYER_CLASS}`);
+  }
+
   private onTimeUpdate(): void {
     const video = this.video;
     if (!video || video.seeking) return;
@@ -292,6 +313,11 @@ export class VideoController implements PlayerShortcuts {
 
     // Resume prompt still showing — leave this video's history untouched.
     if (this.resumePromptActive) return;
+
+    // Live: never qualifies, so nothing below this ever runs for a broadcast.
+    // Re-checked every tick rather than latched, so a stream that closes its playlist mid-session — becoming
+    // an ordinary VOD, `vjs-live` dropped — starts recording from there.
+    if (this.isLive()) return;
 
     // Qualify: first time we cross the threshold, record to history.
     if (!this.watchQualified && video.currentTime >= WATCH_QUALIFY_SEC) {
@@ -357,6 +383,9 @@ export class VideoController implements PlayerShortcuts {
     if (!this.trackedId || !this.watchQualified || !this.video) return;
     // Don't overwrite the saved position while the resume prompt is still up.
     if (this.resumePromptActive) return;
+    // Reached from pause / beforeunload / cleanup as well as the throttle, so
+    // it needs the live guard independently of onTimeUpdate's.
+    if (this.isLive()) return;
     this.lastSaveAt = Date.now();
     const durationSec = Number.isFinite(this.video.duration) ? this.video.duration : undefined;
     void savePosition(this.trackedId, this.video.currentTime, durationSec);
