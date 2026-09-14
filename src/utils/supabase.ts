@@ -73,12 +73,3 @@ export async function ensureAuth(): Promise<boolean> {
   log('supabase signed in');
   return true;
 }
-
-// The signed-in user id, used to scope every row. Null when not authenticated.
-//
-// Reads it off the cached session rather than `auth.getUser()`, which makes a
-// network round trip on every call — and this is called once per queued op.
-export async function getUserId(): Promise<string | null> {
-  const { data } = await getClient().auth.getSession();
-  return data.session?.user.id ?? null;
-}

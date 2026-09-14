@@ -1,20 +1,28 @@
-// Watch-history sync worker.
+// Background worker. Two jobs, which work in opposite ways on purpose.
 //
-// The extension keeps `ext.storage.local` as a write-through cache and Supabase
-// as the source of truth. Every mutation in `utils/history.ts` writes the cache
-// and queues an op; this worker drains that queue outbound and folds the remote
-// table back inbound.
+// 1. Watch-history sync. `ext.storage.local` is a write-through cache and
+//    Supabase is the source of truth: every mutation in `utils/history.ts`
+//    writes the cache and queues an op, and this worker drains that queue
+//    outbound and folds the remote table back inbound.
 //
-// Two things make a service worker the right home for it rather than the content
-// script. First, `VideoController.flushPosition()` runs on `beforeunload`, where
+// 2. Moment marks, over a request/response channel (`MOMENTS_MESSAGE`). Those
+//    are written synchronously with the modal waiting on the answer, so there is
+//    no cache and no queue here — the worker just forwards to `momentsRemote.ts`
+//    and returns what Postgres said. It has to live in the worker regardless:
+//    that is where the one auth session is, and it keeps supabase-js out of the
+//    content-script bundle.
+//
+// Two things make a service worker the right home for the sync half rather than
+// the content script. First, `VideoController.flushPosition()` runs on `beforeunload`, where
 // a network request is dropped when the page dies — but a `storage.local.set` is
 // fast and reliable, and it wakes this worker after the tab is gone. Second, one
 // worker means one auth session and one queue instead of a race between every
 // open VBTV tab and the popup.
 //
-// There is no message passing: the worker is driven entirely by storage changes
-// and alarms, which is the same `storage.onChanged` convention every other
-// surface in this codebase already uses.
+// The sync half is driven entirely by storage changes and alarms — the
+// `storage.onChanged` convention every other surface in this codebase uses. The
+// moment half cannot be: a caller waiting on a server-minted id needs a reply,
+// and storage has no reply channel.
 import {
   SYNC_QUEUE_KEY,
   SYNC_REQUEST_KEY,
@@ -23,6 +31,7 @@ import {
   SYNC_RETRY_MINUTES,
   SYNC_MIN_INTERVAL_SEC,
   SYNC_WAKE_MESSAGE,
+  MOMENTS_MESSAGE,
 } from './constants';
 import ext from './utils/browser';
 import { log } from './utils/logger';
@@ -37,6 +46,16 @@ import {
   pullRecent,
   pullTombstonedIds,
 } from './utils/historyRemote';
+import { upsertVideo } from './utils/videosRemote';
+import type { MomentsRequest } from './utils/moments';
+import {
+  createTaxonomyItem,
+  deleteMoment,
+  listMoments,
+  loadTaxonomy,
+  saveMoment,
+  updateMoment,
+} from './utils/momentsRemote';
 
 const PULL_ALARM = 'better-vbtv-sync-pull';
 const RETRY_ALARM = 'better-vbtv-sync-retry';
@@ -105,6 +124,11 @@ async function drain(): Promise<void> {
           await pushClearAll();
         } else if (op.kind === 'delete') {
           await pushTombstone(op.id);
+        } else if (op.kind === 'video') {
+          // The one op that carries its own payload — `videos.ts` explains why.
+          // No cache lookup, and nothing to discard it against: a video row is
+          // valid whether or not the video was ever watched.
+          await upsertVideo(op.video);
         } else {
           const entry = entries.get(op.id);
           // Dropped from the cache before we got to it (pruned, or deleted by a
@@ -156,7 +180,12 @@ async function pull(): Promise<void> {
     await ensureAuth();
     const [remote, tombstoned] = await Promise.all([pullRecent(), pullTombstonedIds()]);
     const pending = await readQueue();
-    const protectedIds = pending.flatMap((op) => (op.kind === 'clear' ? [] : [op.id]));
+    // Only watch-history intent protects an entry from tombstone eviction. A
+    // pending `video` op says a row exists in another table; it says nothing
+    // about whether this device still wants the entry in its history.
+    const protectedIds = pending.flatMap((op) =>
+      op.kind === 'upsert' || op.kind === 'delete' ? [op.id] : [],
+    );
     const changed = await mergeRemote(remote, { tombstoned, protectedIds });
 
     const remoteById = new Map(remote.map((e) => [e.id, e]));
@@ -244,6 +273,50 @@ ext.runtime.onMessage.addListener(
     return false;
   },
 );
+
+// --- Moments RPC ----------------------------------------------------------
+
+// The moment modal, waiting on a reply. Everything below runs a live Supabase
+// call and returns its result; nothing is cached, queued or retried, so an error
+// here is an error the user sees on screen.
+async function handleMomentsRequest(request: MomentsRequest): Promise<unknown> {
+  if (!isSupabaseConfigured()) {
+    // Not an internal failure — this build simply has no `.env`. Say so plainly,
+    // because the modal shows this string verbatim.
+    throw new Error('Supabase is not configured in this build, so moments cannot be saved.');
+  }
+  switch (request.action) {
+    case 'taxonomy':
+      return loadTaxonomy();
+    case 'createTaxonomyItem':
+      return createTaxonomyItem(request.kind, request.name);
+    case 'saveMoment':
+      return saveMoment(request.moment);
+    case 'listMoments':
+      return listMoments(request.videoId);
+    case 'updateMoment':
+      return updateMoment(request.id, request.patch);
+    case 'deleteMoment':
+      return deleteMoment(request.id);
+    default:
+      throw new Error('Unknown moments request.');
+  }
+}
+
+ext.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
+  if ((message as { type?: string } | undefined)?.type !== MOMENTS_MESSAGE) return false;
+  // `return true` plus `sendResponse` rather than returning a promise: Firefox
+  // honours either, but Chrome ignores a returned promise and closes the channel
+  // before the await resolves, which the caller sees as an undefined reply.
+  handleMomentsRequest(message as MomentsRequest).then(
+    (data) => sendResponse({ ok: true, data }),
+    (err) => {
+      log('moments: request failed', describeError(err));
+      sendResponse({ ok: false, error: describeError(err) });
+    },
+  );
+  return true;
+});
 
 // Secondary path, for when the worker happens to already be running: catches
 // writes from contexts that never sent a message, and the popup's "Sync now".

@@ -7,6 +7,7 @@ A browser extension (Chrome & Firefox) that makes watching [VBTV (Volleyball Wor
 - **Spoiler-free mode** — hides match durations, timecodes, and other result-revealing UI so replays stay a surprise. Toggle from the popup or with the `s` key.
 - **Keyboard seek & controls** — YouTube-style shortcuts on the player page (seek, frame-step, volume, play/pause).
 - **Playback speed** — speed up or slow down replays with `>` / `<`.
+- **Mark a moment** — press `m` on the player to log what just happened: pick a moment type (great dig, monster block…) and optional tags. New values are typo-guarded, so a slip doesn't fork your list. Saved marks show up as pins above the seek bar — click one to edit or remove it.
 - **Shortcuts overlay** — press `?` on the player to see every shortcut.
 - **Watch history + resume** — videos you watch are recorded automatically; reopen one and get a "Resume from mm:ss?" prompt. Browse, open, or clear history from the popup.
 
@@ -28,8 +29,9 @@ Active on the `/player` page:
 | `f` | Toggle fullscreen |
 | `a` | Cycle audio track |
 | `s` | Toggle spoiler-free mode |
+| `m` | Mark a moment (type + tags) |
 | `?` | Toggle shortcuts overlay |
-| `Esc` | Close overlay |
+| `Esc` | Close the overlay or modal |
 
 Seek step sizes and toast font size are configurable in the popup.
 

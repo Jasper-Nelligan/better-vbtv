@@ -14,6 +14,7 @@ import {
 } from "../constants";
 import { getEntry, recordView, savePosition } from "../utils/history";
 import { parseJwMediaId, fetchJwMeta, formatTime } from "../utils/videoMeta";
+import { isModalOpen } from "../utils/modalState";
 import ext from "../utils/browser";
 
 interface PlayerShortcuts {
@@ -103,6 +104,9 @@ export class VideoController implements PlayerShortcuts {
     this.keydownListener = (e: KeyboardEvent) => {
       // Leave Cmd/Ctrl/Alt chords to the browser (Shift stays — it types '<' '>').
       if (e.ctrlKey || e.metaKey || e.altKey) return;
+      // The field checks below don't cover a focused button or chip inside a
+      // modal, where space/f/j would otherwise still reach the player.
+      if (isModalOpen()) return;
 
       const target = e.target as HTMLElement;
       // Don't hijack typing in fields or editable content.

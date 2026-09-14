@@ -73,6 +73,9 @@ export function mountShortcutsOverlay(rootId: string): ShortcutsOverlayHandle {
                 <div class={styles.groupTitle}>General</div>
                 <Row keys={<Kbd k="?" />} label="Show / hide this panel" />
                 <Row keys={<Kbd k="s" />} label="Toggle spoiler-free mode" />
+                <Row keys={<Kbd k="m" />} label="Mark a moment" />
+                <Row keys={<Kbd k="click" />} label="Jump to a moment pin" />
+                <Row keys={<><Kbd k="shift" /><Kbd k="click" /></>} label="Edit a moment pin" />
               </div>
               <div class={styles.group}>
                 <div class={styles.groupTitle}>Seek</div>

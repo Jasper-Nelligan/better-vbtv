@@ -1,7 +1,16 @@
 export const ROOT_ID = "better-vbtv"
 export const SHORTCUTS_OVERLAY_ID = "better-vbtv-shortcuts"
 export const TOAST_ID = "better-vbtv-toast"
+export const MOMENT_MODAL_ID = "better-vbtv-moment"
 export const VIDEO_SELECTOR = 'video'
+// Every thumbnail card on a browse/list page is an anchor to the player URL.
+// Both surfaces that work off cards — the progress bars and the click recorder —
+// find their cards with this.
+export const VIDEO_LINK_SELECTOR = 'a[href*="self-link"]'
+// video.js seek bar. The *control* is the click target and our positioning
+// context; the *holder* is the narrower inner track the pins are a fraction of.
+export const PROGRESS_CONTROL_SELECTOR = '.vjs-progress-control'
+export const PROGRESS_HOLDER_SELECTOR = '.vjs-progress-holder'
 export const PAGE_PATHS = {
   PLAYER: '/player'
 }
@@ -54,6 +63,9 @@ export const SUPABASE_MIGRATED_KEY = 'SUPABASE_MIGRATED'
 export const SUPABASE_SESSION_KEY = 'SUPABASE_SESSION'
 // Remote table backing the watch history.
 export const WATCH_HISTORY_TABLE = 'watch_history'
+// Remote table of videos themselves — what a video *is*, as opposed to what this
+// account did with it. `watch_history.media_id` is a foreign key into it.
+export const VIDEOS_TABLE = 'videos'
 // Alarm cadence: how often to pull the remote table into the local cache.
 export const SYNC_PULL_MINUTES = 15
 // Alarm cadence: retry a failed drain after this long.
@@ -66,3 +78,21 @@ export const SYNC_WAKE_MESSAGE = 'SYNC_WAKE'
 // Opening ten tabs, or reloading in a loop, must not mean ten pulls. The
 // popup's "Sync now" is an explicit request and ignores this.
 export const SYNC_MIN_INTERVAL_SEC = 30
+
+// --- Moments ---
+// Unlike watch history, the moment feature keeps no local cache and queues
+// nothing: the modal talks to Supabase synchronously and Postgres mints the ids.
+// So there are no storage keys here — only the remote tables and the channel the
+// content script reaches the worker on. See src/utils/moments.ts for why.
+export const MOMENT_TYPES_TABLE = 'moment_types'
+export const MOMENT_TAGS_TABLE = 'moment_tags'
+// A third taxonomy, identical in shape to moment_tags and separate from it on
+// purpose: tags say what happened, players say who did it, and one merged list
+// stops being searchable as soon as a roster is in it.
+export const PLAYERS_TABLE = 'players'
+export const MOMENTS_TABLE = 'moments'
+// Content script -> background worker, request/response. Message passing rather
+// than the usual storage convention because these calls need an *answer* (the
+// server-minted id), and because supabase-js has to stay out of the content
+// bundle, so the worker is the only context that can make the request.
+export const MOMENTS_MESSAGE = 'BVTV_MOMENTS'

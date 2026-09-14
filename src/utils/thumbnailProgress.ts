@@ -1,4 +1,4 @@
-import { WATCH_HISTORY_KEY } from '../constants';
+import { VIDEO_LINK_SELECTOR, WATCH_HISTORY_KEY } from '../constants';
 import { getHistory, type HistoryEntry } from './history';
 import { parseJwMediaId } from './videoMeta';
 import ext from './browser';
@@ -19,9 +19,6 @@ import { log } from './logger';
 // rendered and `styles.css` shows exactly one, keyed off `with-spoiler` on
 // <body> — same trick as the rest of the spoiler CSS, so nothing here has to
 // subscribe to the setting or re-render when it flips.
-
-// Thumbnail cards link to the player; this is the same param the player page uses.
-const LINK_SELECTOR = 'a[href*="self-link"]';
 
 const BAR_CLASS = 'better-vbtv-progress';
 const FILL_CLASS = 'better-vbtv-progress-fill';
@@ -118,7 +115,7 @@ export class ThumbnailProgress {
 
   private apply(): void {
     document
-      .querySelectorAll<HTMLAnchorElement>(LINK_SELECTOR)
+      .querySelectorAll<HTMLAnchorElement>(VIDEO_LINK_SELECTOR)
       .forEach((anchor) => this.applyToAnchor(anchor));
   }
 

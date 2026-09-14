@@ -1,0 +1,216 @@
+/* Palette matches ShortcutsOverlay.module.css (panel chrome) and the popup's
+   `.field input` rules, so the modal reads as the same surface. */
+.wrapper {
+  position: relative;
+  display: block;
+}
+
+.label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #818cf8;
+  margin-bottom: 0.4rem;
+}
+
+.required,
+.optional {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.68rem;
+}
+
+.required {
+  color: #f0abfc;
+}
+
+.optional {
+  color: #71717a;
+}
+
+.field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.5rem;
+  background: #27272a;
+  border: 1px solid #3f3f46;
+  border-radius: 6px;
+  cursor: text;
+}
+
+.field:focus-within {
+  border-color: #818cf8;
+}
+
+.input {
+  flex: 1 1 8ch;
+  min-width: 8ch;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #fff;
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.15rem 0;
+}
+
+.input::placeholder {
+  color: #71717a;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.1rem 0.2rem 0.1rem 0.45rem;
+  background: #3f3f46;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  color: #e4e4e7;
+}
+
+.chipRemove {
+  background: transparent;
+  border: none;
+  color: #a1a1aa;
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 0.2rem;
+}
+
+.chipRemove:hover {
+  color: #fff;
+}
+
+.dropdown {
+  position: absolute;
+  z-index: 1;
+  left: 0;
+  right: 0;
+  margin-top: 0.25rem;
+  max-height: 220px;
+  overflow-y: auto;
+  background: #202024;
+  border: 1px solid #3f3f46;
+  border-radius: 8px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0.25rem;
+}
+
+.row {
+  padding: 0.35rem 0.5rem;
+  border-radius: 5px;
+  font-size: 0.82rem;
+  color: #d4d4d8;
+  cursor: pointer;
+}
+
+.active {
+  background: #3f3f46;
+  color: #fff;
+}
+
+.createRow {
+  color: #818cf8;
+}
+
+.groupTitle {
+  padding: 0.4rem 0.5rem 0.2rem;
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #71717a;
+}
+
+.empty {
+  padding: 0.5rem;
+  font-size: 0.78rem;
+  color: #71717a;
+}
+
+/* The typo guard: replaces the "Create …" row in place rather than opening a
+   second dialog, so the near-matches above stay on screen. */
+.confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  padding: 0.45rem 0.5rem;
+  border-radius: 5px;
+  background: #2e2e35;
+  border: 1px solid #4c4c57;
+  font-size: 0.8rem;
+  color: #d4d4d8;
+}
+
+.confirmText strong {
+  color: #fff;
+  font-weight: 600;
+}
+
+.confirmActions {
+  display: inline-flex;
+  gap: 0.35rem;
+}
+
+.confirmAdd,
+.confirmCancel {
+  padding: 0.2rem 0.6rem;
+  border-radius: 5px;
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.confirmAdd {
+  background: #818cf8;
+  border: 1px solid #818cf8;
+  color: #18181b;
+  font-weight: 600;
+}
+
+.confirmAdd:hover {
+  background: #9aa2fa;
+}
+
+.confirmCancel {
+  background: transparent;
+  border: 1px solid #52525b;
+  color: #d4d4d8;
+}
+
+.confirmCancel:hover {
+  color: #fff;
+  border-color: #71717a;
+}
+
+.confirmAdd:focus-visible,
+.confirmCancel:focus-visible {
+  outline: 2px solid #c7d2fe;
+  outline-offset: 1px;
+}
+
+/* Replaces the "Add … as new?" prompt when the create request failed. The strip
+   stays open so Retry is one click and the typed text is not lost. */
+.confirmError {
+  color: #fca5a5;
+}
+
+.confirmAdd:disabled,
+.confirmCancel:disabled {
+  opacity: 0.55;
+  cursor: default;
+}

@@ -56,3 +56,69 @@ body.with-spoiler .better-vbtv-watched {
   z-index: 2;
   pointer-events: none;
 }
+
+/* --- Moment pins on the player's seek bar (utils/momentMarkers.ts) ---------
+   The rail is sized in JS to overlay the seek bar exactly. It must not eat
+   clicks: seeking has to keep working everywhere except on a pin head. */
+.better-vbtv-marker-rail {
+  position: absolute;
+  z-index: 3;
+  pointer-events: none;
+}
+
+/* The pin head: a square sitting clear above the bar, with the stem reaching
+   down to it. This is the whole click target. */
+.better-vbtv-marker {
+  position: absolute;
+  bottom: 100%;
+  margin-bottom: 7px;
+  width: 11px;
+  height: 11px;
+  padding: 0;
+  transform: translateX(-50%);
+  border: 1px solid rgba(0, 0, 0, 0.55);
+  border-radius: 2px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+/* Hover/focus goes to the accent the modal uses, rather than a lighter white:
+   against a bright video frame, white-on-white would read as no feedback. */
+.better-vbtv-marker:hover,
+.better-vbtv-marker:focus-visible {
+  background: #818cf8;
+  outline: none;
+}
+
+.better-vbtv-marker-stem {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  width: 2px;
+  height: 7px;
+  margin-left: -1px;
+  background: #fff;
+  pointer-events: none;
+}
+
+/* The stem tracks the head so the pin changes as one object. */
+.better-vbtv-marker:hover .better-vbtv-marker-stem,
+.better-vbtv-marker:focus-visible .better-vbtv-marker-stem {
+  background: #818cf8;
+}
+
+/* The head is a <button> living inside video.js's control bar, so the player's
+   own `.video-js .vjs-control-bar button` rules (two classes + an element)
+   outrank the bare class above and repaint it. Winning the cascade needs both
+   the ancestor and the element in the selector, and !important on top — the
+   page's rules use it too, same as the spoiler rule at the top of this file. */
+.vjs-control-bar button.better-vbtv-marker {
+  background: #fff !important;
+}
+
+.vjs-control-bar button.better-vbtv-marker:hover,
+.vjs-control-bar button.better-vbtv-marker:focus-visible {
+  background: #818cf8 !important;
+}

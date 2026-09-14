@@ -1,6 +1,7 @@
 import { SYNC_QUEUE_KEY, SYNC_QUEUE_MAX_OPS, SYNC_WAKE_MESSAGE } from '../constants';
 import ext from './browser';
 import { createMutex } from './mutex';
+import type { VideoRecord } from './videos';
 
 // An outbound mutation waiting to reach Supabase.
 //
@@ -8,10 +9,16 @@ import { createMutex } from './mutex';
 // the worker reads the current entry from the local cache when it drains. That
 // means a video saving its position every POSITION_SAVE_SEC collapses into a
 // single queued op and a single round trip, however long playback runs.
+//
+// `video` is the exception, and has to be: it carries its payload because there
+// is no cache behind it to re-read. The upload date is scraped out of a browse
+// page the worker cannot see and the user has already navigated away from, so if
+// the op does not hold it, nothing does.
 export type SyncOp =
   | { kind: 'upsert'; id: string; at: number }
   | { kind: 'delete'; id: string; at: number }
-  | { kind: 'clear'; at: number };
+  | { kind: 'clear'; at: number }
+  | { kind: 'video'; id: string; at: number; video: VideoRecord };
 
 const lock = createMutex();
 
@@ -47,16 +54,27 @@ function wakeWorker(): void {
   }
 }
 
+// Which table an op writes to. Ops only supersede each other within a family:
+// `video` and the watch-history kinds address different rows in different tables,
+// and collapsing across them would mean qualifying a watch silently discarding
+// the queued row that carries the upload date.
+function isVideoOp(op: SyncOp): boolean {
+  return op.kind === 'video';
+}
+
 // Append an op, collapsing anything it supersedes.
 export async function enqueue(op: SyncOp): Promise<void> {
   await lock(async () => {
     const queue = await readQueue();
 
-    // A clear supersedes every pending per-video op; ops queued after it are
-    // later edits and must survive, so order is preserved from here on.
+    // A clear supersedes every pending watch-history op; ops queued after it are
+    // later edits and must survive, so order is preserved from here on. It does
+    // not touch `video` ops — clearing the history does not unmake the videos.
     let next = op.kind === 'clear'
-      ? []
-      : queue.filter((q) => q.kind === 'clear' || q.id !== op.id);
+      ? queue.filter(isVideoOp)
+      : queue.filter(
+          (q) => q.kind === 'clear' || isVideoOp(q) !== isVideoOp(op) || q.id !== op.id,
+        );
     next.push(op);
 
     // Guard against unbounded growth while sync is broken or unconfigured.

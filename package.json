@@ -21,7 +21,12 @@
     "build": "rimraf dist/chromium && vite build",
     "build:firefox": "rimraf dist/firefox && cross-env BROWSER=firefox vite build",
     "zip": "cd dist/chromium && bestzip ../better-vbtv-chromium.zip *",
-    "zip:firefox": "cd dist/firefox && bestzip ../better-vbtv-firefox.zip *"
+    "zip:firefox": "cd dist/firefox && bestzip ../better-vbtv-firefox.zip *",
+    "db:link": "supabase link",
+    "db:push": "supabase db push",
+    "db:diff": "supabase db diff -f",
+    "db:reset": "supabase db reset",
+    "db:types": "supabase gen types typescript --linked > src/utils/database.types.ts"
   },
   "keywords": [],
   "author": "",
@@ -34,6 +39,7 @@
     "cross-env": "^10.1.0",
     "navigation-api-types": "^0.6.1",
     "rimraf": "^6.1.3",
+    "supabase": "^2.115.0",
     "typescript": "^5.9.3",
     "vite": "^6.4.3",
     "vite-plugin-solid": "^2.11.14",

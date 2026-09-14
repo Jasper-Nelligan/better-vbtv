@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+- **Mark a moment** — press `m` on the player to open a modal that records a moment type (required) and optional tags. Both fields are search-as-you-type comboboxes: they surface near-matches for typos, and creating a new value takes an explicit `Add "…" as new?` confirmation.
+- Saved moments now appear as pins above the player's seek bar. Click a pin's square head to edit that mark's type and tags, or remove it. Pins live inside the player's control bar, so spoiler-free mode hides them along with it.
+- The same playback position can only be marked once per video — re-opening the modal without moving the playhead and saving again is refused with a message rather than recorded twice.
+- Moments, moment types and tags are stored in Supabase (`moment_types`, `moment_tags`, `moments`). Unlike watch history these are written synchronously — the modal waits on the insert and Postgres generates the ids — so a mark is either saved or it tells you it wasn't. Marking a moment therefore needs a working connection; there is no offline queue for it.
+
 ## v1.3.1 — 2026-09-13
 
 ### Changes

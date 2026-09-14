@@ -42,6 +42,9 @@ const logoUrl = ext.runtime.getURL('icons/icon-128.png');
 const SHORTCUTS: { keys: string; label: string }[] = [
   { keys: '?', label: 'Show / hide shortcuts panel' },
   { keys: 's', label: 'Toggle spoiler-free mode' },
+  { keys: 'm', label: 'Mark a moment' },
+  { keys: 'click', label: 'Jump to a moment pin' },
+  { keys: 'shift + click', label: 'Edit a moment pin' },
   { keys: '← →', label: 'Seek (small interval)' },
   { keys: 'j l', label: 'Seek (large interval)' },
   { keys: 'space k', label: 'Play / pause' },

@@ -5,16 +5,21 @@ import { Renderer } from './components/renderer';
 import { log } from './utils/logger';
 import { ElementObserver } from './utils/elementObserver';
 import { PAGE_PATHS, ROOT_ID,
+  MOMENT_MODAL_ID,
   SHORTCUTS_OVERLAY_ID,
   TOAST_ID,
   WITH_SPOILER_CLASS,
   VIDEO_SELECTOR } from './constants'
 import { observeRouteChange } from './utils/routeChangeObserver';
 import { mountShortcutsOverlay } from './components/ShortcutsOverlay';
+import { mountMomentModal } from './components/MomentModal';
+import { MomentMarkers } from './utils/momentMarkers';
 import { mountToast } from './components/Toast';
 import { toast } from './utils/toast';
+import { isModalOpen } from './utils/modalState';
 import { getNoSpoiler, setNoSpoiler } from './utils/settings';
 import { ThumbnailProgress } from './utils/thumbnailProgress';
+import { VideoClicks } from './utils/videoClicks';
 import { requestPassiveSync } from './utils/syncStatus';
 import ext from './utils/browser';
 
@@ -22,6 +27,20 @@ log("🏐🏐🏐")
 
 mountToast(TOAST_ID);
 const shortcutsOverlay = mountShortcutsOverlay(SHORTCUTS_OVERLAY_ID);
+
+// Pins on the seek bar and the modal are two halves of one feature, wired to
+// each other here rather than to each other's internals: a shift-click on a pin
+// opens the editor, and any write the editor completes re-reads the pins. A
+// plain click just seeks, and never reaches this file.
+const momentMarkers = new MomentMarkers({
+  onEdit: (moment) => {
+    shortcutsOverlay.hide(); // it sits on a higher layer; don't bury the modal
+    momentModal.edit(moment);
+  },
+});
+const momentModal = mountMomentModal(MOMENT_MODAL_ID, {
+  onChanged: () => momentMarkers.refresh(),
+});
 let onPlayerPage = false;
 
 // Draw watch-progress bars on thumbnails across every VBTV page. This is
@@ -29,6 +48,13 @@ let onPlayerPage = false;
 // cards), so it lives outside the player-only route handling below.
 const thumbnailProgress = new ThumbnailProgress();
 void thumbnailProgress.start();
+
+// Record a `videos` row whenever a card is clicked. Route-agnostic for the same
+// reason — cards are everywhere but the player page — and it has to run on the
+// browse page specifically: the upload date is only on the card, and only until
+// the SPA navigates away from it.
+const videoClicks = new VideoClicks();
+videoClicks.start();
 
 // Pull the remote watch history into this device's cache now. Nothing else in
 // the content script ever asks for one — `enqueue()`'s wake message only drains
@@ -46,6 +72,8 @@ await initializeSpoilerFreeState();
 // Keyboard shortcuts:
 // - "s"  toggles spoiler-free mode (any VBTV page)
 // - "?"  (Shift+/) toggles the shortcuts overlay (player page only)
+// - "m"  opens the mark-a-moment modal (player page only); saved marks also
+//        appear as clickable pins above the seek bar (utils/momentMarkers.ts)
 // - Esc  closes the overlay
 //
 // Listen on `window` in the CAPTURE phase so we receive the key before the
@@ -58,12 +86,25 @@ function setupGlobalKeyboard() {
       return;
     }
 
+    // An open modal owns the keyboard outright — Escape included, so it can
+    // close its own dropdown before the modal itself.
+    if (isModalOpen()) return;
+
     const isQuestionMark = e.key === '?' || (e.code === 'Slash' && e.shiftKey);
     if (isQuestionMark) {
       if (!onPlayerPage) return; // overlay is player-only
       e.preventDefault();
       e.stopPropagation();
       shortcutsOverlay.toggle();
+      return;
+    }
+
+    if (e.key.toLowerCase() === 'm' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+      if (!onPlayerPage) return; // the modal marks a moment in a video
+      e.preventDefault();
+      e.stopPropagation();
+      shortcutsOverlay.hide(); // it sits on a higher layer; don't bury the modal
+      momentModal.show();
       return;
     }
 
@@ -148,10 +189,15 @@ function handleRouteChange(pathname: string) {
     observer.observe(() => {
       renderer = createRenderer()
       renderer.render()
+      // Started here rather than on the route change: it needs the <video> the
+      // observer just waited for, to read a duration to place pins against.
+      momentMarkers.start()
     })
   } else {
     log("Not on player page")
     shortcutsOverlay.hide()
+    momentModal.hide()
+    momentMarkers.stop()
     cleanupObserver()
     cleanupRenderer()
   }
@@ -193,5 +239,7 @@ window.addEventListener('beforeunload', () => {
   }
   cleanupObserver()
   cleanupRenderer()
+  momentMarkers.stop()
   thumbnailProgress.stop()
+  videoClicks.stop()
 });
