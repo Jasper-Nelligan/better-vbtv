@@ -91,7 +91,6 @@ export function mountShortcutsOverlay(rootId: string): ShortcutsOverlayHandle {
               <div class={styles.group}>
                 <div class={styles.groupTitle}>Volume</div>
                 <Row keys={<><Kbd k="↑" /><Kbd k="↓" /></>} label="Volume up / down" />
-                <Row keys={<Kbd k="m" />} label="Mute" />
               </div>
             </div>
             <div class={styles.footer}>Change seek intervals in the extension popup.</div>
