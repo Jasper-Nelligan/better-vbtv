@@ -45,7 +45,14 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # Without these secrets the build still succeeds; the extension just
+      # falls back to local-only watch history with sync disabled.
       - name: Build Chromium (Chrome / Opera) and Firefox
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_SUPABASE_EMAIL: ${{ secrets.VITE_SUPABASE_EMAIL }}
+          VITE_SUPABASE_PASSWORD: ${{ secrets.VITE_SUPABASE_PASSWORD }}
         run: |
           pnpm build
           pnpm build:firefox

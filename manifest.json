@@ -3,9 +3,14 @@
   "name": "Better VBTV",
   "version": "1.3.1",
   "description": "Watch VBTV (Volleyball World TV) replays spoiler-free, with keyboard seek, playback speed, shortcuts overlay, and resume history.",
-  "permissions": ["activeTab", "storage"],
+  "permissions": ["activeTab", "storage", "alarms"],
+  "host_permissions": ["https://*.supabase.co/*"],
   "action": {
     "default_popup": "src/index.html"
+  },
+  "background": {
+    "service_worker": "src/background.ts",
+    "type": "module"
   },
   "content_scripts": [
     {

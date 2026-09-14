@@ -15,6 +15,7 @@ import { mountToast } from './components/Toast';
 import { toast } from './utils/toast';
 import { getNoSpoiler, setNoSpoiler } from './utils/settings';
 import { ThumbnailProgress } from './utils/thumbnailProgress';
+import { requestPassiveSync } from './utils/syncStatus';
 import ext from './utils/browser';
 
 log("🏐🏐🏐")
@@ -28,6 +29,15 @@ let onPlayerPage = false;
 // cards), so it lives outside the player-only route handling below.
 const thumbnailProgress = new ThumbnailProgress();
 void thumbnailProgress.start();
+
+// Pull the remote watch history into this device's cache now. Nothing else in
+// the content script ever asks for one — `enqueue()`'s wake message only drains
+// the *outbound* queue — so without this a cache that is empty or stale (a
+// second browser, a fresh profile, anything watched elsewhere) stays that way
+// until the worker's 15-minute alarm fires: no thumbnail progress bars, and no
+// resume prompt. The worker throttles these, so reloading in a loop is cheap.
+// Both surfaces pick the result up through `storage.onChanged`.
+requestPassiveSync();
 
 setupSpoilerFreeToggleListener();
 setupGlobalKeyboard();

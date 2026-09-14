@@ -10,6 +10,7 @@ import {
   WATCH_QUALIFY_SEC,
   POSITION_SAVE_SEC,
   LIVE_PLAYER_CLASS,
+  WATCH_HISTORY_KEY,
 } from "../constants";
 import { getEntry, recordView, savePosition } from "../utils/history";
 import { parseJwMediaId, fetchJwMeta, formatTime } from "../utils/videoMeta";
@@ -50,6 +51,8 @@ export class VideoController implements PlayerShortcuts {
   private trackedId: string | null = null; // id we're currently recording for
   private watchQualified: boolean = false; // recorded to history yet?
   private resumePromptActive: boolean = false; // resume toast still showing for trackedId?
+  private resumeOffered: boolean = false;  // already prompted for trackedId
+  private resumeChecking: boolean = false; // maybeOfferResume() in flight
   private finished: boolean = false;       // reached the end; ignore the reset-to-0
   private lastSaveAt: number = 0;          // throttle clock for position writes
   private seekSaveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -58,6 +61,7 @@ export class VideoController implements PlayerShortcuts {
   private pauseListener: (() => void) | null = null;
   private endedListener: (() => void) | null = null;
   private beforeUnloadListener: (() => void) | null = null;
+  private historyListener: Parameters<typeof chrome.storage.onChanged.addListener>[0] | null = null;
 
   constructor({
     selector,
@@ -253,9 +257,35 @@ export class VideoController implements PlayerShortcuts {
     this.video.addEventListener('pause', this.pauseListener);
     this.video.addEventListener('ended', this.endedListener);
     window.addEventListener('beforeunload', this.beforeUnloadListener);
+
+    // The Supabase pull lands *after* the player has mounted — on a device that
+    // hasn't cached this video yet, that arrival is the only time its history
+    // ever exists locally, and the read above already missed it. Re-check on
+    // every cache write so the resume prompt is still offered. maybeOfferResume
+    // holds the guards, so a write we made ourselves is a cheap no-op.
+    this.historyListener = (changes, area) => {
+      if (area !== 'local' || !changes[WATCH_HISTORY_KEY]) return;
+      if (this.trackedId) void this.maybeOfferResume(this.trackedId);
+    };
+    ext.storage.onChanged.addListener(this.historyListener);
   }
 
   private async maybeOfferResume(id: string): Promise<void> {
+    // Offer at most once per video, and only while the user is still at the top
+    // of it — past the qualify threshold they are watching, and an unsolicited
+    // "Resume?" would be an interruption rather than a help.
+    if (this.resumeOffered || this.resumeChecking || this.watchQualified) return;
+    if (this.video && this.video.currentTime > WATCH_QUALIFY_SEC) return;
+
+    this.resumeChecking = true;
+    try {
+      await this.offerResume(id);
+    } finally {
+      this.resumeChecking = false;
+    }
+  }
+
+  private async offerResume(id: string): Promise<void> {
     const entry = await getEntry(id);
     if (!entry || entry.positionSec <= WATCH_QUALIFY_SEC) return;
     // Skip if effectively finished (within last 15s of a known duration).
@@ -264,6 +294,7 @@ export class VideoController implements PlayerShortcuts {
     if (parseJwMediaId(window.location.href) !== id) return;
 
     const pos = entry.positionSec;
+    this.resumeOffered = true;
     // Freeze history writes for this video until the user acts on the prompt.
     this.resumePromptActive = true;
     toast(`Resume from ${formatTime(pos)}?`, {
@@ -314,6 +345,7 @@ export class VideoController implements PlayerShortcuts {
       this.flushPosition();      // save the outgoing video first
       this.trackedId = id;
       this.watchQualified = false;
+      this.resumeOffered = false;
       this.resumePromptActive = false; // cleared; re-armed by maybeOfferResume if it prompts
       this.finished = false;
       this.lastSaveAt = 0;
@@ -455,6 +487,10 @@ export class VideoController implements PlayerShortcuts {
     if (this.seekEnforceTimer) {
       clearTimeout(this.seekEnforceTimer);
       this.seekEnforceTimer = null;
+    }
+    if (this.historyListener) {
+      ext.storage.onChanged.removeListener(this.historyListener);
+      this.historyListener = null;
     }
     this.timeupdateListener = null;
     this.seekedListener = null;

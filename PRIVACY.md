@@ -2,7 +2,14 @@
 
 ## Data Collection
 
-The Better VBTV extension does not collect, store, or transmit any personal data. The only data stored is your spoiler-free preference setting (enabled/disabled) and your watch history (video titles, thumbnails, and last playback positions), both saved locally in your browser using Chrome's storage API. This data never leaves your device.
+The Better VBTV extension does not collect, store, or transmit any personal data
+for the developer's benefit. Your spoiler-free preference setting
+(enabled/disabled) and your watch history (video titles, thumbnails, and last
+playback positions) are saved locally in your browser using Chrome's storage API.
+
+This build additionally synchronises your watch history to a Supabase database
+that you own and configure yourself (see Third-Party Services). Your preference
+settings are never synchronised and remain local to your device.
 
 ## Website Access
 
@@ -29,10 +36,17 @@ activity. JW Player may receive standard request metadata such as your IP
 address and user agent. This is the same content provider that serves the
 video on VBTV itself.
 
-Aside from the font and video-metadata requests described above, no personal
-data, browsing activity, or watch history is ever sent to Google, JW Player,
-or any other third party. Your watch history and preferences remain stored
-locally on your device.
+When Supabase credentials are configured at build time, your watch history is
+also uploaded to the Supabase project those credentials point at. What is sent
+is exactly what the history stores: the video's JW media id, its title, its
+thumbnail URL, the player URL, your playback position and the video duration,
+and a timestamp. Access is restricted to the single account the extension signs
+in as, enforced by row-level security. With no credentials configured, no such
+requests are made and history stays on your device.
+
+Aside from the font, video-metadata, and Supabase requests described above, no
+personal data, browsing activity, or watch history is ever sent to Google,
+JW Player, or any other third party.
 
 ## Updates
 

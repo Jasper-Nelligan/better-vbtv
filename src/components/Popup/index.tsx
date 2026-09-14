@@ -8,6 +8,7 @@ import {
   DEFAULT_SEEK_LARGE,
   DEFAULT_TOAST_FONT_SIZE,
   WATCH_HISTORY_KEY,
+  SYNC_STATUS_KEY,
 } from '../../constants';
 import {
   getNoSpoiler,
@@ -24,6 +25,12 @@ import {
   TOAST_FONT_MAX,
 } from '../../utils/settings';
 import { getHistory, removeEntry, clearHistory, type HistoryEntry } from '../../utils/history';
+import {
+  getSyncStatus,
+  requestSync,
+  DEFAULT_SYNC_STATUS,
+  type SyncStatus,
+} from '../../utils/syncStatus';
 import { formatTime, formatAgo } from '../../utils/videoMeta';
 import { log } from '../../utils/logger';
 import ext from '../../utils/browser';
@@ -52,6 +59,7 @@ const Popup = () => {
   const [large, setLarge] = createSignal(DEFAULT_SEEK_LARGE);
   const [fontSize, setFontSize] = createSignal(DEFAULT_TOAST_FONT_SIZE);
   const [history, setHistory] = createSignal<HistoryEntry[]>([]);
+  const [sync, setSync] = createSignal<SyncStatus>(DEFAULT_SYNC_STATUS);
 
   // Scroll affordance: fade hints show only when more rows exist that direction.
   const [canScrollUp, setCanScrollUp] = createSignal(false);
@@ -78,6 +86,7 @@ const Popup = () => {
     setLarge(iv.large);
     setFontSize(await getToastFontSize());
     setHistory(await getHistory());
+    setSync(await getSyncStatus());
 
     // Reflect changes made elsewhere (e.g. the "s" hotkey on the page).
     ext.storage.onChanged.addListener((changes, area) => {
@@ -88,6 +97,10 @@ const Popup = () => {
       // Live-refresh the list as videos are watched on the page.
       if (changes[WATCH_HISTORY_KEY]) {
         void getHistory().then(setHistory);
+      }
+      // Sync progress reported by the background worker.
+      if (changes[SYNC_STATUS_KEY]) {
+        setSync({ ...DEFAULT_SYNC_STATUS, ...(changes[SYNC_STATUS_KEY].newValue as Partial<SyncStatus>) });
       }
     });
 
@@ -151,6 +164,22 @@ const Popup = () => {
     await clearHistory();
   };
 
+  // One line describing where sync stands, in priority order: unconfigured
+  // builds first, then errors, then work still queued, then the happy path.
+  const syncLabel = () => {
+    const s = sync();
+    if (!s.configured) return 'Cloud sync off — history is local only';
+    if (s.lastError) return `⚠️ ${s.lastError}`;
+    if (s.pending > 0) return `⏳ ${s.pending} change${s.pending === 1 ? '' : 's'} pending`;
+    if (s.lastSyncAt) return `☁️ Synced ${formatAgo(s.lastSyncAt)}`;
+    if (s.signedIn) return '☁️ Signed in';
+    return 'Connecting…';
+  };
+
+  const handleSyncNow = async () => {
+    await requestSync();
+  };
+
   const progressPct = (entry: HistoryEntry) =>
     entry.durationSec > 0
       ? Math.min(100, Math.round((entry.positionSec / entry.durationSec) * 100))
@@ -185,6 +214,12 @@ const Popup = () => {
           <p class={styles.sectionTitle}>Watch history</p>
           <Show when={history().length > 0}>
             <button class={styles.clearAll} onClick={handleClearAll}>Clear all</button>
+          </Show>
+        </div>
+        <div class={styles.syncRow}>
+          <span class={styles.hint}>{syncLabel()}</span>
+          <Show when={sync().configured}>
+            <button class={styles.clearAll} onClick={handleSyncNow}>Sync now</button>
           </Show>
         </div>
         <Show

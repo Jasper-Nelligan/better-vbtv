@@ -320,3 +320,19 @@
 .footer p + p {
   margin-top: 0.75rem;
 }
+
+/* Cloud-sync status line, directly under the watch-history header. */
+.syncRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: -2px 0 8px;
+  min-height: 18px;
+}
+
+.syncRow .hint {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

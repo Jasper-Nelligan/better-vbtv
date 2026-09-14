@@ -39,3 +39,30 @@ export const POSITION_SAVE_SEC = 5
 export const HISTORY_MAX_ENTRIES = 100
 // Public JW Player delivery feed — returns title + poster for a media id, no auth.
 export const JW_MEDIA_FEED = 'https://cdn.jwplayer.com/v2/media/'
+
+// --- Supabase sync ---
+// Outbound op queue, drained by the background service worker. Persisted (rather
+// than held in memory) so it survives both page unload and SW termination.
+export const SYNC_QUEUE_KEY = 'SYNC_QUEUE'
+// Last-known sync state, surfaced by the popup.
+export const SYNC_STATUS_KEY = 'SYNC_STATUS'
+// Bumped by the popup's "Sync now" button; the write wakes the SW.
+export const SYNC_REQUEST_KEY = 'SYNC_REQUEST'
+// Set once the pre-existing local history has been pushed to Supabase.
+export const SUPABASE_MIGRATED_KEY = 'SUPABASE_MIGRATED'
+// Where supabase-js persists its session (service workers have no localStorage).
+export const SUPABASE_SESSION_KEY = 'SUPABASE_SESSION'
+// Remote table backing the watch history.
+export const WATCH_HISTORY_TABLE = 'watch_history'
+// Alarm cadence: how often to pull the remote table into the local cache.
+export const SYNC_PULL_MINUTES = 15
+// Alarm cadence: retry a failed drain after this long.
+export const SYNC_RETRY_MINUTES = 1
+// Stop the queue growing without bound while sync is broken or unconfigured.
+export const SYNC_QUEUE_MAX_OPS = 500
+// Content script / popup -> background worker: "the queue has work".
+export const SYNC_WAKE_MESSAGE = 'SYNC_WAKE'
+// Floor between *passive* full cycles (the nudge every VBTV page load sends).
+// Opening ten tabs, or reloading in a loop, must not mean ten pulls. The
+// popup's "Sync now" is an explicit request and ignores this.
+export const SYNC_MIN_INTERVAL_SEC = 30
