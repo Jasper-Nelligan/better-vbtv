@@ -8,6 +8,20 @@ body:not(.with-spoiler) .vjs-control-bar {
   display: none !important;
 }
 
+/* Watch history on thumbnails (browse/list views) comes in two forms, and
+   spoiler-free mode picks between them. The bar gives away the runtime — the
+   position it fills, against the minutes watched, is the video's length and so
+   the end of the match — so with spoilers hidden it is swapped for a label
+   stating only how long the user watched. Both are always in the DOM (see
+   utils/thumbnailProgress.ts); these two rules are the whole switch. */
+body:not(.with-spoiler) .better-vbtv-progress {
+  display: none;
+}
+
+body.with-spoiler .better-vbtv-watched {
+  display: none;
+}
+
 /* YouTube-style watch-progress bar overlaid on thumbnails (browse/list views) */
 .better-vbtv-progress {
   position: absolute;
@@ -23,4 +37,22 @@ body:not(.with-spoiler) .vjs-control-bar {
 .better-vbtv-progress-fill {
   height: 100%;
   background: #ff0000;
+}
+
+/* The spoiler-free stand-in for the bar. Bottom-left, so it doesn't land on the
+   card's own runtime label (`.bg-runtime`, blurred above) on the right. */
+.better-vbtv-watched {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  z-index: 2;
+  pointer-events: none;
 }
