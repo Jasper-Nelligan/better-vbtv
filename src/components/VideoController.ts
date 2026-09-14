@@ -9,6 +9,7 @@ import {
   SEEK_ENFORCE_TOLERANCE_SEC,
   WATCH_QUALIFY_SEC,
   POSITION_SAVE_SEC,
+  LIVE_PLAYER_CLASS,
 } from "../constants";
 import { getEntry, recordView, savePosition } from "../utils/history";
 import { parseJwMediaId, fetchJwMeta, formatTime } from "../utils/videoMeta";
@@ -283,6 +284,26 @@ export class VideoController implements PlayerShortcuts {
     });
   }
 
+  // A live stream has no resume point and no meaningful progress, because
+  // `currentTime` is a position on the stream's timeline rather than an amount
+  // watched: joining a match at the 90th minute puts the playhead at 90:00
+  // immediately. Recording that would say "watched 90 minutes" after five
+  // seconds — and since the replay VOD reuses the same JW media id, the entry
+  // outlives the broadcast and marks the replay as already finished. So live
+  // playback is excluded from history entirely.
+  //
+  // Both checks are needed. A pure live stream reports no duration, but one with
+  // a DVR window reports the seekable end, which is finite and merely grows, so
+  // only the player's own `vjs-live` flag catches that. Neither can false-positive
+  // on a VOD; the isFinite() arm is also true before metadata arrives, which is
+  // harmless — nothing worth saving exists that early either.
+  private isLive(): boolean {
+    const video = this.video;
+    if (!video) return false;
+    if (!Number.isFinite(video.duration)) return true;
+    return !!video.closest(`.${LIVE_PLAYER_CLASS}`);
+  }
+
   private onTimeUpdate(): void {
     const video = this.video;
     if (!video || video.seeking) return;
@@ -313,6 +334,12 @@ export class VideoController implements PlayerShortcuts {
       if (video.paused || nearEnd || video.currentTime < WATCH_QUALIFY_SEC) return;
       this.finished = false;
     }
+
+    // Live: never qualifies, so nothing below this ever runs for a broadcast
+    // (and `onEnded` bails on !watchQualified). Re-checked every tick rather
+    // than latched, so a stream that closes its playlist mid-session — becoming
+    // an ordinary VOD, `vjs-live` dropped — starts recording from there.
+    if (this.isLive()) return;
 
     // Qualify: first time we cross the threshold, record to history.
     if (!this.watchQualified && video.currentTime >= WATCH_QUALIFY_SEC) {
@@ -371,6 +398,8 @@ export class VideoController implements PlayerShortcuts {
     const video = this.video;
     if (!video || !this.trackedId || !this.watchQualified) return;
     if (this.resumePromptActive) return;
+    // A broadcast ending is not a video being finished.
+    if (this.isLive()) return;
     this.finished = true;
     const durationSec = Number.isFinite(video.duration) ? video.duration : undefined;
     if (durationSec) {
@@ -398,6 +427,9 @@ export class VideoController implements PlayerShortcuts {
     if (!this.trackedId || !this.watchQualified || !this.video) return;
     // Don't overwrite the saved position while the resume prompt is still up.
     if (this.resumePromptActive) return;
+    // Reached from pause / beforeunload / cleanup as well as the throttle, so
+    // it needs the live guard independently of onTimeUpdate's.
+    if (this.isLive()) return;
     // Video finished (or is sitting on the end-of-playback reset-to-0): onEnded
     // already stored it as complete, so leave it be.
     if (this.finished || this.video.ended) return;

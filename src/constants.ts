@@ -27,6 +27,12 @@ export const DEFAULT_TOAST_FONT_SIZE = 12
 export const WATCH_HISTORY_KEY = 'WATCH_HISTORY'
 // Min continuous playtime (seconds) before a video is recorded to history.
 export const WATCH_QUALIFY_SEC = 5
+// A live stream is not eligible for history at all — see VideoController's
+// `isLive()`. video.js flags a live playlist with this class on the player root,
+// which is the only dependable signal: a DVR stream reports a *finite* duration
+// (the seekable end, which grows with wall-clock time), so an isFinite() check
+// on its own sees nothing unusual.
+export const LIVE_PLAYER_CLASS = 'vjs-live'
 // Throttle/debounce for persisting the resume position (seconds).
 export const POSITION_SAVE_SEC = 5
 // Cap the stored list so storage can't grow unbounded.
